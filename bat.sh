@@ -1,3 +1,10 @@
 #!/bin/bash
-python3 run.py -c example_configurations/bat/bfs.ini -o output_bfs
-python3 run.py -c example_configurations/bat/md.ini -o output_md
+
+CONFIG_FOLD=example_configurations/bat
+
+for file in $CONFIG_FOLD/*; do
+  CONFIG_NO_EXT="${file%.*}"
+  OUTPUT_FOLD=output_benchmarks/$(basename $CONFIG_NO_EXT)
+  echo python3 ./run.py -c $file -o $OUTPUT_FOLD
+  python3 ./run.py -c $file -o $OUTPUT_FOLD
+done
