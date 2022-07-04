@@ -23,6 +23,7 @@ import ast
 import configparser as cp
 import logging
 import os
+import pandas as pd
 import pickle
 import pprint
 import random
@@ -141,6 +142,7 @@ class SequenceDataProcessing:
             self._campaign_configuration['General'].update(general_args)
         else:
             self._logger.error("input_configuration must be a path string to a configuration file or a dictionary")
+            sys.exit(1)
 
         # Check if output path already exist
         if os.path.exists(output) and os.path.exists(self._done_file_flag):
@@ -152,7 +154,9 @@ class SequenceDataProcessing:
             shutil.copyfile(input_configuration, os.path.join(output, 'configuration.ini'))
         confpars = cp.ConfigParser()
         confpars.read_dict(self._campaign_configuration)
-        confpars.write(open(os.path.join(output, 'configuration_enriched.ini'), 'w'))
+        with open(os.path.join(output, 'configuration_enriched.ini'), 'w') as conf_enriched:
+            confpars.write(conf_enriched)
+
 
         # Check that validation method has been specified
         if 'validation' not in self._campaign_configuration['General']:
@@ -318,7 +322,15 @@ class SequenceDataProcessing:
             self._logger.debug("Current data frame is:\n%s", str(data_processing))
             self._logger.info("<--")
 
-        shutil.copyfile(self._campaign_configuration['DataPreparation']['input_path'], os.path.join(self._campaign_configuration['General']['output'], 'data.csv'))
+        data = self._campaign_configuration['DataPreparation']['input_path']
+        if isinstance(data, str):
+            shutil.copyfile(data, os.path.join(self._campaign_configuration['General']['output'], 'data.csv'))
+        elif isinstance(data, pd.DataFrame):
+            data.to_csv(os.path.join(self._campaign_configuration['General']['output'], 'data.csv'))
+        else:
+            self._logger.error("input_path must be a path string to a dataset or a pandas.DataFrame")
+            sys.exit(1)
+
         data_processing.data.to_csv(os.path.join(self._campaign_configuration['General']['output'], 'data_preprocessed.csv'))
 
         regressor = self._model_building.process(self._campaign_configuration, data_processing, int(self._campaign_configuration['General']['j']))
@@ -352,4 +364,10 @@ class SequenceDataProcessing:
         with open(self._done_file_flag, 'wb') as f:
             pass
 
+        
+        #Close logging
+        self._logger.removeHandler(file_handler)
+        file_handler.close()
+        
+        
         return regressor

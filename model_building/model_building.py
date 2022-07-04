@@ -1,6 +1,7 @@
 """
 Copyright 2019 Marco Lattuada
 Copyright 2021 Bruno Guindani
+Copyright 2022 Nahuel Coliva
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -92,7 +93,7 @@ class ModelBuilding:
         Parameters
         ----------
         campaign_configuration: dict of str: dict of str: tr
-            The set of options specified by the user though command line and campaign configuration files
+            The set of options specified by the user through command line and campaign configuration files
 
         regression_inputs: RegressionInputs
             The input of the regression problem
@@ -120,6 +121,7 @@ class ModelBuilding:
             for exp in tqdm.tqdm(expconfs, dynamic_ncols=True):
                 if self.debug:
                     # Do not use try-except mechanism
+                    self._logger.debug("Now training: "+exp.get_signature_string()) #explicitly show the experiments of expconfs
                     exp.train()
                 else:
                     try:
@@ -136,6 +138,7 @@ class ModelBuilding:
             self._logger.info("<--")
 
         self._logger.info("-->Collecting results")
+
         results = re.Results(campaign_configuration, expconfs)
         results.collect_data()
         self._logger.info("<--Collected")
@@ -145,6 +148,7 @@ class ModelBuilding:
                 self._logger.debug("%s: MAPE on %s set is %f", signature, experiment_configuration, mape)
 
         best_confs, best_technique = results.get_bests()
+        results.dismiss_handler()
         best_regressors = {}
 
         file_handler = logging.FileHandler(os.path.join(campaign_configuration['General']['output'], 'results.txt'), 'a+')
@@ -178,11 +182,18 @@ class ModelBuilding:
                 normalizer = data_preparation.normalization.Normalization(campaign_configuration)
                 all_data = normalizer.process(all_data)
 
-            # Set training set
+            if 'save_training_regressors' in campaign_configuration['General'] and campaign_configuration['General']['save_training_regressors']:
+                # Build the regressor trained on the train set only
+                training_regressor = regressor.Regressor(campaign_configuration, best_conf.get_regressor(), best_conf.get_x_columns(), regression_inputs.scalers)
+                pickle_training_file_name = os.path.join(campaign_configuration['General']['output'], ec.enum_to_configuration_label[technique] + "_training.pickle")
+                with open(pickle_training_file_name, "wb") as pickle_file:
+                    pickle.dump(training_regressor, pickle_file, protocol=4)
+
+            # Set training set as the whole dataframe
             best_conf.set_training_data(all_data)
 
             # Train and evaluate by several metrics
-            best_conf.train()
+            best_conf.train(force=True)
             best_conf.evaluate()
 
             self._logger.addHandler(file_handler)
@@ -194,7 +205,7 @@ class ModelBuilding:
             self._logger.info("<--")
             self._logger.removeHandler(file_handler)
 
-            # Build the regressor
+            # Build the regressor with all data
             best_regressors[technique] = regressor.Regressor(campaign_configuration, best_conf.get_regressor(), best_conf.get_x_columns(), all_data.scalers)
             pickle_file_name = os.path.join(campaign_configuration['General']['output'], ec.enum_to_configuration_label[technique] + ".pickle")
             with open(pickle_file_name, "wb") as pickle_file:
