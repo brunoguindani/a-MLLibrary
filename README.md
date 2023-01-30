@@ -61,7 +61,7 @@ sudo docker build -t amllibrary .
 ```
 To run a container and mount a volume which includes the root folder of this repository, please use
 ```shell
-sudo docker run --name aml --rm -v $(pwd):/aMLlibrary -it amllibrary
+sudo docker run --name aml --rm -v $(pwd):/aMLLibrary -it amllibrary
 ```
 which defaults to a `bash` terminal unless a specific command is appended to the line.
 In this terminal, you may run the same commands as in a regular terminal, including the ones from the [Tutorial](#tutorial) section.
