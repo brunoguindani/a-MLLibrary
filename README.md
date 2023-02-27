@@ -4,23 +4,22 @@ Library for the generation of regression models.
 The main script of the library is `run.py`:
 
 ```
-usage: run.py [-h] -c CONFIGURATION_FILE [-d] [-s SEED] [-o OUTPUT] [-j J]
-              [-g] [-t] [-l]
+usage: run.py [-h] -c CONFIGURATION_FILE [-d] [-o OUTPUT] [-j J] [-g] [-l] [-k]
 
 Perform exploration of regression techniques
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -c CONFIGURATION_FILE, --configuration-file CONFIGURATION_FILE
-                        The configuration file for the infrastructure
-  -d, --debug           Enable debug messages
-  -s SEED, --seed SEED  The seed
+                        configuration file for the infrastructure
+  -d, --debug           enable debug messages
   -o OUTPUT, --output OUTPUT
-                        The output where all the models will be stored
-  -j J                  The number of processes to be used
-  -g, --generate-plots  Generate plots
-  -t, --self-check      Predict the input data with the generate regressor
-  -l, --details         Print results of the single experiments
+                        output folder where all the models will be stored
+  -j J                  number of processes to be used
+  -g, --generate-plots  generate plots
+  -l, --details         print results of the single experiments
+  -k, --keep-temp       do not remove temporary files after successful execution
+
 ```
 Example of configuration files can be found under `example_configurations` directory.
 See also the [`README.md`](example_configurations/README.md) file there.
