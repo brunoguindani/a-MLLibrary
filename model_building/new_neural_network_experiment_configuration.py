@@ -22,6 +22,26 @@ import torch.nn as nn
 
 import model_building.experiment_configuration as ec
 
+class NeuralNetwork(nn.Module):
+    """
+    Definizione della classe della rete neurale.
+    """
+
+    def __init__(self, layer_sizes, dropout_prob):
+        super(NewNeuralNetworkExperimentConfiguration, self).__init__()
+        layers = []
+        for i in range(len(layer_sizes) - 1):
+            layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
+            if i < len(layer_sizes) - 2:
+                # Activate Function
+                layers.append(nn.ReLU())
+                # Dropout
+                layers.append(nn.Dropout(dropout_prob))
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.layers(x)
+        return x
 
 class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
     """
@@ -77,10 +97,11 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         assert isinstance(prefix, list)
         signature = prefix.copy()
-        signature.append("alpha_" + str(self._hyperparameters['alpha']))
+        signature.append("layer_sizes" + str(self._hyperparameters['layer_sizes']))
+        signature.append("dropout_prob" + str(self._hyperparameters['dropout_prob']))
         return signature
 
-    def _train(self):
+    def _train(self):#to do
         """
         Build the model with the experiment configuration represented by this object
         """
@@ -92,7 +113,7 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         for idx, col_name in enumerate(self.get_x_columns()):
             self._logger.debug("The coefficient for %s is %f", col_name, self._regressor.coef_[idx])
 
-    def compute_estimations(self, rows):
+    def compute_estimations(self, rows):#to do
         """
         Compute the predictions for data points indicated in rows estimated by the regressor
 
@@ -108,7 +129,7 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         xdata, _ = self._regression_inputs.get_xy_data(rows)
         return self._regressor.predict(xdata)# non si puo usare predict per pytorch
 
-    def print_model(self):
+    def print_model(self):#to do
         """
         Print the representation of the generated model
         """
@@ -136,29 +157,16 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         Initialize the regressor object for the experiments
         """
-        def __init__(self, layer_sizes, dropout_prob):
-            super(NewNeuralNetworkExperimentConfiguration, self).__init__()
-            layers = []
-            for i in range(len(layer_sizes) - 1):
-                layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
-                if i < len(layer_sizes) - 2:
-                    # Activate Function
-                    layers.append(nn.ReLU())
-                    # Dropout
-                    layers.append(nn.Dropout(dropout_prob))
-            self.layers = nn.Sequential(*layers)
-    
-        def forward(self, x):
-            x = self.layers(x)
-            return x
-        
-        layer_sizes = [10, 20, 10, 1] 
-        dropout_prob = 0.5
-        model = NewNeuralNetworkExperimentConfiguration(layer_sizes, dropout_prob)
+        if not getattr(self, '_hyperparameters', None):
+            self._regressor = NeuralNetwork()#cosa succede qui??
+        else:
+            self._regressor = NeuralNetwork(
+                layer_sizes = self._hyperparameters['layer_sizes'],
+                dropout_prob = self._hyperparameters['dropout_prob'])
             
 
     def get_default_parameters(self):
         """
         Get a dictionary with all technique parameters with default values
         """
-        return {'alpha': 0.1}
+        return {'layer_sizes': [64, 32], 'dropout_prob': 0.5}

@@ -53,7 +53,7 @@ enum_to_configuration_label = {Technique.LR_RIDGE: 'LRRidge', Technique.XGBOOST:
                                Technique.DT: 'DecisionTree', Technique.RF: 'RandomForest',
                                Technique.SVR: 'SVR', Technique.NNLS: 'NNLS',
                                Technique.STEPWISE: 'Stepwise', Technique.DUMMY: 'Dummy',
-                               Technique.NEWNEURAL: 'CustomLR'}
+                               Technique.NEWNEURAL: 'NewNeural'}
 
 
 def mean_absolute_percentage_error(y_true, y_pred):
