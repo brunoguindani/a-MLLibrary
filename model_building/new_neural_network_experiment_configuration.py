@@ -108,7 +108,25 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         self._logger.debug("Building model for %s", self._signature)
         assert self._regression_inputs
         xdata, ydata = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
-        self._regressor.fit(xdata, ydata)# qui al posto di fit ci va il forward es:model()
+        x_train_tensor = torch.tensor(xdata, dtype=torch.float32)
+        y_train_tensor = torch.tensor(ydata, dtype=torch.float32)
+
+        loss_fn = nn.MSELoss()
+        optimizer = torch.optim.SGD(self._regressor.parameters(), lr=0.01)
+        #self._regressor.fit(xdata, ydata) qui al posto di fit ci va il forward es:model()
+        # Train the neural network
+        for epoch in range(self._hyperparameters['epochs']):
+            # Forward pass: compute predicted y by passing x to the model
+            y_pred = self._regressor.forward(x_train_tensor)
+
+            # Compute loss
+            loss = loss_fn(y_pred, y_train_tensor)
+
+            # Zero gradients, backward pass, and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
         self._logger.debug("Model built")
         for idx, col_name in enumerate(self.get_x_columns()):
             self._logger.debug("The coefficient for %s is %f", col_name, self._regressor.coef_[idx])
@@ -133,7 +151,7 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         Print the representation of the generated model
         """
-        initial_string = "LRRidge coefficients:\n"
+        initial_string = "New Neural Network:\n"
         ret_string = initial_string
         coefficients = self._regressor.coef_
         columns = self.get_x_columns()
