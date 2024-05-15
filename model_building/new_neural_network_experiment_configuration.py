@@ -99,9 +99,10 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         signature = prefix.copy()
         signature.append("layer_sizes" + str(self._hyperparameters['layer_sizes']))
         signature.append("dropout_prob" + str(self._hyperparameters['dropout_prob']))
+        signature.append("epochs" + str(self._hyperparameters['epochs'])) 
         return signature
 
-    def _train(self):#to do
+    def _train(self):
         """
         Build the model with the experiment configuration represented by this object
         """
@@ -113,9 +114,8 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
 
         loss_fn = nn.MSELoss()
         optimizer = torch.optim.SGD(self._regressor.parameters(), lr=0.01)
-        #self._regressor.fit(xdata, ydata) qui al posto di fit ci va il forward es:model()
         # Train the neural network
-        for epoch in range(self._hyperparameters['epochs']):
+        for epoch in range(self._hyperparameters['epochs']): #TO DO epoch
             # Forward pass: compute predicted y by passing x to the model
             y_pred = self._regressor.forward(x_train_tensor)
 
@@ -145,9 +145,9 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
             The values predicted by the associated regressor
         """
         xdata, _ = self._regression_inputs.get_xy_data(rows)
-        return self._regressor.predict(xdata)# non si puo usare predict per pytorch
+        return self._regressor.predict(xdata)
 
-    def print_model(self):#to do
+    def print_model(self):
         """
         Print the representation of the generated model
         """
@@ -176,15 +176,14 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         Initialize the regressor object for the experiments
         """
         if not getattr(self, '_hyperparameters', None):
-            self._regressor = NeuralNetwork()#cosa succede qui??
+            self._regressor = NeuralNetwork()
         else:
             self._regressor = NeuralNetwork(
                 layer_sizes = self._hyperparameters['layer_sizes'],
-                dropout_prob = self._hyperparameters['dropout_prob'])
-            
+                dropout_prob = self._hyperparameters['dropout_prob'])            
 
     def get_default_parameters(self):
         """
         Get a dictionary with all technique parameters with default values
         """
-        return {'layer_sizes': [64, 32], 'dropout_prob': 0.5}
+        return {'layer_sizes': [64, 32], 'dropout_prob': 0.5, 'epochs': 100}  # Set default value for epochs
