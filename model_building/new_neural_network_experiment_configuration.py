@@ -28,7 +28,7 @@ class NeuralNetwork(nn.Module):
     """
 
     def __init__(self, layer_sizes, dropout_prob):
-        super(NewNeuralNetworkExperimentConfiguration, self).__init__()
+        super(NeuralNetwork, self).__init__()
         layers = []
         for i in range(len(layer_sizes) - 1):
             layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
