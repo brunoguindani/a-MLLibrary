@@ -18,9 +18,11 @@ import numpy as np
 import sklearn.linear_model as lr
 import torch
 import torch.nn as nn
+import pandas as pd
 
 
 import model_building.experiment_configuration as ec
+import regressor as re
 
 class NeuralNetwork(nn.Module):
     """
@@ -42,6 +44,8 @@ class NeuralNetwork(nn.Module):
     def forward(self, x):
         x = self.layers(x)
         return x
+    
+    
 
 class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
     """
@@ -99,8 +103,9 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         signature = prefix.copy()
         signature.append("layer_sizes" + str(self._hyperparameters['layer_sizes']))
         signature.append("dropout_prob" + str(self._hyperparameters['dropout_prob']))
-        signature.append("epochs" + str(self._hyperparameters['epochs'])) 
+        #signature.append("epochs" + str(self._hyperparameters['epochs'])) 
         return signature
+    
 
     def _train(self):
         """
@@ -109,13 +114,20 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         self._logger.debug("Building model for %s", self._signature)
         assert self._regression_inputs
         xdata, ydata = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
-        x_train_tensor = torch.tensor(xdata, dtype=torch.float32)
-        y_train_tensor = torch.tensor(ydata, dtype=torch.float32)
+        #x_array = xdata.values if isinstance(xdata, pd.DataFrame) else xdata
+        #xdata = pd.get_dummies(xdata)
+        x_array = xdata.values if isinstance(xdata, pd.DataFrame) else xdata
+        x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
+        y_array = ydata.values if isinstance(ydata, pd.Series) else ydata
+        y_array = np.array(y_array)
+        y_train_tensor = torch.tensor(y_array, dtype=torch.float32)
+
 
         loss_fn = nn.MSELoss()
-        optimizer = torch.optim.SGD(self._regressor.parameters(), lr=0.01)
+        optimizer = torch.optim.Adam(self._regressor.parameters(), lr=0.01)
+        epochs = 100
         # Train the neural network
-        for epoch in range(self._hyperparameters['epochs']): #TO DO epoch
+        for epoch in range(epochs): #TO DO epoch
             # Forward pass: compute predicted y by passing x to the model
             y_pred = self._regressor.forward(x_train_tensor)
 
@@ -127,13 +139,16 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
             loss.backward()
             optimizer.step()
 
-        self._logger.debug("Model built")
-        for idx, col_name in enumerate(self.get_x_columns()):
-            self._logger.debug("The coefficient for %s is %f", col_name, self._regressor.coef_[idx])
 
-    def compute_estimations(self, rows):#to do
+        torch.save(self._regressor.state_dict(), 'percorso.pth')
+        self._logger.debug("Model built")
+        #for idx, col_name in enumerate(self.get_x_columns()):
+            #self._logger.debug("The coefficient for %s is %f", col_name, self._regressor.coef_[idx])
+    def compute_estimations(self, rows):
         """
         Compute the predictions for data points indicated in rows estimated by the regressor
+
+        The actual implementation is demanded to the subclasses
 
         Parameters
         ----------
@@ -144,9 +159,24 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         -------
             The values predicted by the associated regressor
         """
-        xdata, _ = self._regression_inputs.get_xy_data(rows)
-        return self._regressor.predict(xdata)
+        self._regressor.state_dict()         
 
+          
+        #self._regressor.load_state_dict(torch.load('percorso.pth'))
+        #self._regressor = torch.load('percorso.pth')
+        self._regressor.eval()
+
+        #with torch.no_grad():
+        with torch.inference_mode():
+            xdata, _ = self._regression_inputs.get_xy_data(rows)
+            x_array = xdata.values if isinstance(xdata, pd.DataFrame) else xdata
+            x_array = np.array(x_array)
+            x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
+            predictions = self._regressor.forward(x_train_tensor)
+
+        return predictions#.detach().numpy()
+    
+    
     def print_model(self):
         """
         Print the representation of the generated model
@@ -186,4 +216,4 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         Get a dictionary with all technique parameters with default values
         """
-        return {'layer_sizes': [64, 32], 'dropout_prob': 0.5, 'epochs': 100}  # Set default value for epochs
+        return {'layer_sizes': [64, 32], 'dropout_prob': 0.5}#, 'epochs': 100}  
