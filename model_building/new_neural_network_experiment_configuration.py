@@ -19,6 +19,8 @@ import sklearn.linear_model as lr
 import torch
 import torch.nn as nn
 import pandas as pd
+#from skorch import NeuralNetRegressor
+import torch.nn.functional as F
 
 
 import model_building.experiment_configuration as ec
@@ -113,23 +115,30 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         self._logger.debug("Building model for %s", self._signature)
         assert self._regression_inputs
+
         xdata, ydata = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
-        #x_array = xdata.values if isinstance(xdata, pd.DataFrame) else xdata
-        #xdata = pd.get_dummies(xdata)
-        x_array = xdata.values if isinstance(xdata, pd.DataFrame) else xdata
+
+        xdata = pd.get_dummies(xdata, drop_first=True)
+        #self._logger.debug(f"{xdata}")
+        x_array = xdata.values.astype(np.float32) if isinstance(xdata, pd.DataFrame) else xdata
+        #self._logger.debug(f"{x_array}")
         x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
-        y_array = ydata.values if isinstance(ydata, pd.Series) else ydata
-        y_array = np.array(y_array)
+
+        y_array = ydata.values.astype(np.float32) if isinstance(ydata, pd.Series) else ydata
+        #y_array = np.array(y_array)
         y_train_tensor = torch.tensor(y_array, dtype=torch.float32)
 
+        self._logger.debug(f"x_train_tensor shape: {x_train_tensor.shape}")
+        self._logger.debug(f"y_train_tensor shape: {y_train_tensor.shape}")
 
         loss_fn = nn.MSELoss()
         optimizer = torch.optim.Adam(self._regressor.parameters(), lr=0.01)
-        epochs = 100
+        epochs = 10
         # Train the neural network
-        for epoch in range(epochs): #TO DO epoch
+        for epoch in range(epochs):
             # Forward pass: compute predicted y by passing x to the model
             y_pred = self._regressor.forward(x_train_tensor)
+            self._logger.debug(f"y_pred shape: {y_pred.shape}")
 
             # Compute loss
             loss = loss_fn(y_pred, y_train_tensor)
@@ -138,7 +147,6 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
 
         torch.save(self._regressor.state_dict(), 'percorso.pth')
         self._logger.debug("Model built")
@@ -159,22 +167,48 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         -------
             The values predicted by the associated regressor
         """
-        self._regressor.state_dict()         
+        newregressor = NeuralNetwork(
+                layer_sizes = self._hyperparameters['layer_sizes'],
+                dropout_prob = self._hyperparameters['dropout_prob'])    
+        newregressor.load_state_dict(torch.load('percorso.pth'))     
+        newregressor.eval()
 
-          
-        #self._regressor.load_state_dict(torch.load('percorso.pth'))
-        #self._regressor = torch.load('percorso.pth')
-        self._regressor.eval()
-
-        #with torch.no_grad():
-        with torch.inference_mode():
+        with torch.no_grad():
             xdata, _ = self._regression_inputs.get_xy_data(rows)
-            x_array = xdata.values if isinstance(xdata, pd.DataFrame) else xdata
-            x_array = np.array(x_array)
-            x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
-            predictions = self._regressor.forward(x_train_tensor)
+            self._logger.debug(f"xdata shape during prediction: {xdata.shape}")
+            xdata = pd.get_dummies(xdata, drop_first=True)
 
-        return predictions#.detach().numpy()
+            x_array = xdata.values.astype(np.float64) if isinstance(xdata, pd.DataFrame) else xdata
+            #x_array = np.array(x_array)
+            x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
+
+
+            self._logger.debug(f"x_train_tensor shape during prediction: {x_train_tensor.shape}")
+
+            predictions = newregressor(x_train_tensor)
+            #predictions = predictions.reshape(-1,1)
+            self._logger.debug(f"predictions shape: {predictions.shape}")
+
+
+        return predictions.detach().numpy()
+    
+    """def compute_estimations(self, rows):
+        net = NeuralNetRegressor(
+            self._regressor,
+            max_epochs=10,
+            lr=0.01,
+            criterion=nn.MSELoss,
+            optimizer=torch.optim.Adam,
+            iterator_train__shuffle=True
+        )
+
+        X_train, y_train = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
+        net.fit(X_train, y_train)
+        xdata, _ = self._regression_inputs.get_xy_data(rows)
+
+        predictions = net.predict(xdata)
+        return predictions"""
+
     
     
     def print_model(self):
