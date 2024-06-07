@@ -31,9 +31,17 @@ class NeuralNetwork(nn.Module):
     Definizione della classe della rete neurale.
     """
 
-    def __init__(self, layer_sizes, dropout_prob):
+    def __init__(self, input_size, layer_sizes, dropout_prob):
         super(NeuralNetwork, self).__init__()
+
+        layer_sizes =list(layer_sizes)
+        # Ultimo layer con 1 neurone
+        layer_sizes.append(1)
+
         layers = []
+        # Primo layer con numero di neuroni basato sulla dimensione dell'input
+        layers.append(nn.Linear(input_size, layer_sizes[0]))
+
         for i in range(len(layer_sizes) - 1):
             layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
             if i < len(layer_sizes) - 2:
@@ -46,6 +54,8 @@ class NeuralNetwork(nn.Module):
     def forward(self, x):
         x = self.layers(x)
         return x
+    
+
     
     
 
@@ -105,7 +115,6 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         signature = prefix.copy()
         signature.append("layer_sizes" + str(self._hyperparameters['layer_sizes']))
         signature.append("dropout_prob" + str(self._hyperparameters['dropout_prob']))
-        #signature.append("epochs" + str(self._hyperparameters['epochs'])) 
         return signature
     
 
@@ -119,21 +128,16 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         xdata, ydata = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
 
         xdata = pd.get_dummies(xdata, drop_first=True)
-        #self._logger.debug(f"{xdata}")
         x_array = xdata.values.astype(np.float32) if isinstance(xdata, pd.DataFrame) else xdata
-        #self._logger.debug(f"{x_array}")
         x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
 
         y_array = ydata.values.astype(np.float32) if isinstance(ydata, pd.Series) else ydata
-        #y_array = np.array(y_array)
         y_train_tensor = torch.tensor(y_array, dtype=torch.float32)
 
-        self._logger.debug(f"x_train_tensor shape: {x_train_tensor.shape}")
-        self._logger.debug(f"y_train_tensor shape: {y_train_tensor.shape}")
 
         loss_fn = nn.MSELoss()
         optimizer = torch.optim.Adam(self._regressor.parameters(), lr=0.01)
-        epochs = 10
+        epochs = 100
         # Train the neural network
         for epoch in range(epochs):
             # Forward pass: compute predicted y by passing x to the model
@@ -148,10 +152,8 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
             loss.backward()
             optimizer.step()
 
-        torch.save(self._regressor.state_dict(), 'percorso.pth')
         self._logger.debug("Model built")
-        #for idx, col_name in enumerate(self.get_x_columns()):
-            #self._logger.debug("The coefficient for %s is %f", col_name, self._regressor.coef_[idx])
+
     def compute_estimations(self, rows):
         """
         Compute the predictions for data points indicated in rows estimated by the regressor
@@ -167,72 +169,26 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         -------
             The values predicted by the associated regressor
         """
-        newregressor = NeuralNetwork(
-                layer_sizes = self._hyperparameters['layer_sizes'],
-                dropout_prob = self._hyperparameters['dropout_prob'])    
-        newregressor.load_state_dict(torch.load('percorso.pth'))     
-        newregressor.eval()
 
         with torch.no_grad():
             xdata, _ = self._regression_inputs.get_xy_data(rows)
-            self._logger.debug(f"xdata shape during prediction: {xdata.shape}")
             xdata = pd.get_dummies(xdata, drop_first=True)
 
             x_array = xdata.values.astype(np.float64) if isinstance(xdata, pd.DataFrame) else xdata
-            #x_array = np.array(x_array)
             x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
 
+            predictions = self._regressor(x_train_tensor)
 
-            self._logger.debug(f"x_train_tensor shape during prediction: {x_train_tensor.shape}")
-
-            predictions = newregressor(x_train_tensor)
-            #predictions = predictions.reshape(-1,1)
-            self._logger.debug(f"predictions shape: {predictions.shape}")
 
 
         return predictions.detach().numpy()
-    
-    """def compute_estimations(self, rows):
-        net = NeuralNetRegressor(
-            self._regressor,
-            max_epochs=10,
-            lr=0.01,
-            criterion=nn.MSELoss,
-            optimizer=torch.optim.Adam,
-            iterator_train__shuffle=True
-        )
-
-        X_train, y_train = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
-        net.fit(X_train, y_train)
-        xdata, _ = self._regression_inputs.get_xy_data(rows)
-
-        predictions = net.predict(xdata)
-        return predictions"""
-
-    
+     
     
     def print_model(self):
         """
         Print the representation of the generated model
         """
-        initial_string = "New Neural Network:\n"
-        ret_string = initial_string
-        coefficients = self._regressor.coef_
-        columns = self.get_x_columns()
-
-        assert len(columns) == len(coefficients)
-
-        # Show coefficients in order of decresing absolute value
-        idxs = np.argsort(np.abs(coefficients))[::-1]
-        signif_digits = 4
-        for i in idxs:
-            column = columns[i]
-            coefficient = coefficients[i]
-            ret_string += " + " if ret_string != initial_string else "   "
-            coeff = str(round(coefficient, signif_digits))
-            ret_string = ret_string + "(" + str(coeff) + " * " + column + ")\n"
-        coeff = str(round(self._regressor.intercept_, signif_digits))
-        ret_string = ret_string + " + (" + coeff + ")"
+        ret_string = "Neural Network model:\n"
         return ret_string
 
     def initialize_regressor(self):
@@ -242,7 +198,12 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         if not getattr(self, '_hyperparameters', None):
             self._regressor = NeuralNetwork()
         else:
-            self._regressor = NeuralNetwork(
+            # Ottenere i dati di input 
+            xdata, _ = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
+            # Determinare la dimensione dell'input
+            input_size = xdata.shape[1] 
+
+            self._regressor = NeuralNetwork(input_size,
                 layer_sizes = self._hyperparameters['layer_sizes'],
                 dropout_prob = self._hyperparameters['dropout_prob'])            
 
@@ -250,4 +211,4 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         Get a dictionary with all technique parameters with default values
         """
-        return {'layer_sizes': [64, 32], 'dropout_prob': 0.5}#, 'epochs': 100}  
+        return {'layer_sizes': [64, 32], 'dropout_prob': 0.5}
