@@ -25,9 +25,6 @@ import model_building.experiment_configuration as ec
 
 
 class NeuralNetwork(nn.Module):
-    """
-    Definizione della classe della rete neurale.
-    """
 
     def __init__(self, input_size, layer_sizes, dropout_prob):
         super(NeuralNetwork, self).__init__()
@@ -52,6 +49,30 @@ class NeuralNetwork(nn.Module):
     def forward(self, x):
         x = self.layers(x)
         return x
+    
+    def predict(self, input_data):
+        """
+        Parameters
+        ----------
+        input_dataframe : pandas.DataFrame
+            The DataFrame containing the input data for which we want to make predictions.
+
+        Returns
+        -------
+        predictions : torch.Tensor
+            Tensor containing the predictions.
+        """
+
+        xdata = pd.get_dummies(input_data, drop_first=True)
+        x_array = xdata.values.astype(np.float64) if isinstance(xdata, pd.DataFrame) else xdata
+        x_tensor = torch.tensor(x_array, dtype=torch.float32)
+
+        self.eval()
+
+        with torch.no_grad():
+            predictions = self(x_tensor).squeeze()
+
+        return predictions.detach().numpy()
     
 
     
