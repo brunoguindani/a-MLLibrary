@@ -19,12 +19,10 @@ import sklearn.linear_model as lr
 import torch
 import torch.nn as nn
 import pandas as pd
-#from skorch import NeuralNetRegressor
-import torch.nn.functional as F
 
 
 import model_building.experiment_configuration as ec
-import regressor as re
+
 
 class NeuralNetwork(nn.Module):
     """
@@ -35,11 +33,11 @@ class NeuralNetwork(nn.Module):
         super(NeuralNetwork, self).__init__()
 
         layer_sizes =list(layer_sizes)
-        # Ultimo layer con 1 neurone
+        # Last layer with 1 neuron
         layer_sizes.append(1)
 
         layers = []
-        # Primo layer con numero di neuroni basato sulla dimensione dell'input
+        # First layer with number of neurons based on input size
         layers.append(nn.Linear(input_size, layer_sizes[0]))
 
         for i in range(len(layer_sizes) - 1):
@@ -179,8 +177,6 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
 
             predictions = self._regressor(x_train_tensor)
 
-
-
         return predictions.detach().numpy()
      
     
@@ -198,9 +194,7 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         if not getattr(self, '_hyperparameters', None):
             self._regressor = NeuralNetwork()
         else:
-            # Ottenere i dati di input 
             xdata, _ = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
-            # Determinare la dimensione dell'input
             input_size = xdata.shape[1] 
 
             self._regressor = NeuralNetwork(input_size,
