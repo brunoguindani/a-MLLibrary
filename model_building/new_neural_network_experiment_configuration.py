@@ -62,9 +62,7 @@ class NeuralNetwork(nn.Module):
         predictions : torch.Tensor
             Tensor containing the predictions.
         """
-
-        xdata = pd.get_dummies(input_data, drop_first=True)
-        x_array = xdata.values.astype(np.float64) if isinstance(xdata, pd.DataFrame) else xdata
+        x_array = input_data.values.astype(np.float64) if isinstance(input_data, pd.DataFrame) else input_data
         x_tensor = torch.tensor(x_array, dtype=torch.float32)
 
         self.eval()
@@ -146,7 +144,6 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
 
         xdata, ydata = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
 
-        xdata = pd.get_dummies(xdata, drop_first=True)
         x_array = xdata.values.astype(np.float32) if isinstance(xdata, pd.DataFrame) else xdata
         x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
 
@@ -191,7 +188,6 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
 
         with torch.no_grad():
             xdata, _ = self._regression_inputs.get_xy_data(rows)
-            xdata = pd.get_dummies(xdata, drop_first=True)
 
             x_array = xdata.values.astype(np.float64) if isinstance(xdata, pd.DataFrame) else xdata
             x_train_tensor = torch.tensor(x_array, dtype=torch.float32)
@@ -205,7 +201,7 @@ class NewNeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         Print the representation of the generated model
         """
-        ret_string = "Neural Network model:\n"
+        ret_string = "Neural Network model:\n" + str(self._regressor)
         return ret_string
 
     def initialize_regressor(self):
