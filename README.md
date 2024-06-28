@@ -46,14 +46,7 @@ pip install -r requirements.txt
 ```
 
 This library also integrates neural networks via the Keras API.
-If you plan to use them, you must install one of the available backends, either manually via `pip` or by adding them to the `requirements.txt` beforehand.
-The following backends were tested:
-```
-tensorflow==2.16.1
-torch==2.3.1
-jax==0.4.29
-```
-Note that the latter also requires `jaxlib` to be installed.
+If you plan to use them, you must install the Torch backends, either manually via `pip` or by adding it to the `requirements.txt` beforehand (`torch==2.3.1` was tested).
 
 
 ## Tutorial

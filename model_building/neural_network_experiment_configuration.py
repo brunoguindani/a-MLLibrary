@@ -18,8 +18,54 @@ import logging
 import numpy as np
 import os
 import pandas as pd
+from sklearn.base import BaseEstimator
 
 import model_building.experiment_configuration as ec
+
+# Disable Keras logging
+os.environ['KERAS_BACKEND'] = 'torch'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+logging.getLogger('tensorflow').setLevel(logging.ERROR)
+
+import keras
+
+
+class AMLNeuralNetwork(keras.Sequential, BaseEstimator):
+    def __init__(self, n_features, dropouts, activation, optimizer, learning_rate, loss, batch_size, epochs):
+        # Convert single dropout number to a proper list of values
+        if isinstance(dropouts, (list, tuple)):
+            dropouts_init = tuple(dropouts)
+        else:
+            dropouts_init = tuple(len(n_features) * [dropouts])
+
+        # First layer with number of neurons based on input size
+        layers = []
+        layers.append(keras.layers.Input(shape=self.aml_input_shape))
+        # Intermediate layers
+        for i in range(len(n_features)):
+            layers.append(keras.layers.Dense(n_features[i], activation=activation))
+            layers.append(keras.layers.Dropout(dropouts_init[i]))
+        # Output layer
+        layers.append(keras.layers.Dense(1))
+
+        # Save parameters as class members
+        self.n_features = n_features
+        self.dropouts = dropouts
+        self.activation = activation
+        self.optimizer = optimizer
+        self.learning_rate = learning_rate
+        self.loss = loss
+        self.batch_size = batch_size
+        self.epochs = epochs
+
+        # Initialize and compile model
+        super().__init__(layers)
+        self.compile(loss=loss, optimizer=optimizer, metrics=[keras.metrics.RootMeanSquaredError()])
+        self.optimizer.learning_rate.assign(learning_rate)
+
+    @classmethod
+    def from_config(cls, config):
+        return keras.Sequential.from_config(config)
 
 
 class NeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
@@ -60,8 +106,6 @@ class NeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         assert prefix
         super().__init__(campaign_configuration, hyperparameters, regression_inputs, prefix)
         self.technique = ec.Technique.NEURAL_NETWORK
-        # Get Keras backend or resort to default value
-        self.backend = campaign_configuration['General'].get('keras_backend', 'tensorflow')
 
     def _compute_signature(self, prefix):
         """
@@ -144,43 +188,18 @@ class NeuralNetworkExperimentConfiguration(ec.ExperimentConfiguration):
         """
         Initialize the regressor object for the experiments
         """
-        os.environ['KERAS_BACKEND'] = self.backend
-        # Disable logging (Keras uses the TensorFlow library even with different backends)
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-        logging.getLogger('tensorflow').setLevel(logging.ERROR)
-
-        import keras
-
         xdata, _ = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
-        input_shape = (xdata.shape[1],)
-        layers_sizes = self._hyperparameters['n_features']
-        dropout_ini = self._hyperparameters['dropouts']
-        if isinstance(dropout_ini, list):
-            dropouts = dropout_ini
-        else:
-            dropouts = len(layers_sizes) * [dropout_ini]
-
-        # First layer with number of neurons based on input size
-        layers = []
-        layers.append(keras.layers.Input(shape=input_shape))
-        # Intermediate layers
-        for i in range(len(layers_sizes)):
-            layers.append(keras.layers.Dense(layers_sizes[i], activation=self._hyperparameters['activation']))
-            layers.append(keras.layers.Dropout(dropouts[i]))
-        # Output layer
-        layers.append(keras.layers.Dense(1))
-
-        # Initialize and compile model
-        self._regressor = keras.Sequential(layers)
-        self._regressor.compile(loss=self._hyperparameters['loss'],
-                                optimizer=self._hyperparameters['optimizer'],
-                                metrics=[keras.metrics.RootMeanSquaredError()]
+        AMLNeuralNetwork.aml_input_shape = (xdata.shape[1],)
+        self._regressor = AMLNeuralNetwork(
+            n_features=self._hyperparameters['n_features'], dropouts=self._hyperparameters['dropouts'],
+            activation=self._hyperparameters['activation'], optimizer=self._hyperparameters['optimizer'],
+            learning_rate=self._hyperparameters['learning_rate'], loss=self._hyperparameters['loss'],
+            batch_size=self._hyperparameters['batch_size'], epochs=self._hyperparameters['epochs']
         )
-        self._regressor.optimizer.learning_rate.assign(self._hyperparameters['learning_rate'])
 
     def get_default_parameters(self):
         """
         Get a dictionary with all technique parameters with default values
         """
-        return {'n_features': [20, 10], 'dropouts': [0.2, 0.2], 'activation': 'relu', 'optimizer': 'adam',
+        return {'n_features': (20, 10), 'dropouts': 0.2, 'activation': 'relu', 'optimizer': 'adam',
                 'learning_rate': 0.001, 'loss': 'mse', 'batch_size': 10, 'epochs': 5}

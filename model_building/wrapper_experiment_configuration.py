@@ -377,6 +377,7 @@ class HyperoptExperimentConfiguration(WrapperExperimentConfiguration):
             status value to report that the computation was successful
         """
         Xtrain, ytrain = self._regression_inputs.get_xy_data(self._regression_inputs.inputs_split["training"])
+        self._wrapped_regressor.aml_input_shape = (Xtrain.shape[1],)
         self._wrapped_regressor.__init__(**params)
         score = sklearn.model_selection.cross_val_score(self._wrapped_regressor, Xtrain, ytrain, scoring='r2', cv=5).mean()
         return {'loss': -score, 'status': STATUS_OK}
